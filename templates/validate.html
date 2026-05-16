@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+{% block title %}Validasi Dokter — #{{ data.id }}{% endblock %}
+{% block content %}
+{% set g = data.dr_grade %}
+{% set DR_COLORS = ['grade-0','grade-1','grade-2','grade-3','grade-4'] %}
+{% set DR_EMOJI = ['🟢','🟡','🟠','🔴','🆘'] %}
+<div class="page-wrapper">
+  <div class="page-header">
+    <h1>Validasi Dokter</h1>
+    <p>Rekaman <strong>#{{ data.id }}</strong> &nbsp;|&nbsp; Pasien: <strong>{{ data.patient_id }}</strong>{% if
+      data.patient_name %} — {{ data.patient_name }}{% endif %}</p>
+  </div>
+
+  <!-- AI Summary -->
+  <div class="card" style="margin-bottom:1.5rem;">
+    <div class="card-title"><span aria-hidden="true">🧠</span> Ringkasan Prediksi AI</div>
+    <div class="flex gap-3 items-center flex-wrap">
+      <div class="grade-badge {{ DR_COLORS[g] }}" role="status">{{ DR_EMOJI[g] }} Grade {{ g }} — {{ data.dr_label }}
+      </div>
+      <span class="fw-600" style="color:var(--green-700);">Confidence: {{ data.confidence | round(1) }}%</span>
+    </div>
+    <div class="prob-bars mt-2">
+      {% set LABELS = ['No DR','Mild DR','Moderate DR','Severe DR','Proliferative DR'] %}
+      {% for i in range(5) %}{% set pct = (data.fusion_probs[i] * 100) | round(1) %}
+      <div class="prob-row">
+        <span class="prob-label">{{ LABELS[i] }}</span>
+        <div class="prob-bar-bg" role="progressbar" aria-valuenow="{{ pct }}" aria-valuemin="0" aria-valuemax="100">
+          <div class="prob-bar-fill bar-{{ i }}" style="width:{{ pct }}%;"></div>
+        </div>
+        <span class="prob-pct" aria-hidden="true">{{ pct }}%</span>
+      </div>{% endfor %}
+    </div>
+  </div>
+
+  <!-- Rekomendasi Otomatis -->
+  <div class="card" style="margin-bottom:1.5rem;">
+    <div class="card-title"><span aria-hidden="true">🤖</span> Rekomendasi Otomatis Sistem</div>
+    <p style="font-size:.82rem;color:#4b5563;margin-bottom:1rem;">Digenerate otomatis berdasarkan <strong>Grade {{ g }}
+        — {{ data.dr_label }}</strong>.</p>
+    <div class="flex gap-3 flex-wrap" style="align-items:flex-start;">
+      <section style="flex:1;min-width:240px;" aria-labelledby="lbl-klinis">
+        <h2 id="lbl-klinis" style="font-size:.85rem;font-weight:700;color:var(--green-800);margin-bottom:.6rem;">🏥
+          Klinis</h2>
+        <ul style="list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:.4rem;">
+          {% for rec in auto_clinical %}
+          <li
+            style="display:flex;gap:.5rem;background:var(--green-50);border:1px solid var(--green-200);border-radius:.5rem;padding:.45rem .65rem;font-size:.83rem;color:var(--green-900);">
+            <span aria-hidden="true" style="color:var(--green-500);flex-shrink:0;">✔</span>{{ rec }}
+          </li>
+          {% endfor %}
+        </ul>
+      </section>
+      <section style="flex:1;min-width:240px;" aria-labelledby="lbl-nonklinis">
+        <h2 id="lbl-nonklinis" style="font-size:.85rem;font-weight:700;color:var(--green-800);margin-bottom:.6rem;">🌿
+          Non-Klinis</h2>
+        <ul style="list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:.4rem;">
+          {% for rec in auto_nonclinical %}
+          <li
+            style="display:flex;gap:.5rem;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:.5rem;padding:.45rem .65rem;font-size:.83rem;color:var(--green-900);">
+            <span aria-hidden="true" style="color:#16a34a;flex-shrink:0;">✔</span>{{ rec }}
+          </li>
+          {% endfor %}
+        </ul>
+      </section>
+    </div>
+  </div>
+
+  <!-- Form Validasi -->
+  <form method="POST" action="{{ url_for('validate', pred_id=data.id) }}" novalidate>
+
+    <div class="card" style="margin-bottom:1.25rem;">
+      <div class="card-title"><span aria-hidden="true">🩺</span> Keputusan Validasi</div>
+      <p id="status-hint" style="font-size:.82rem;color:#4b5563;margin-bottom:1rem;">Pilih satu status validasi. Wajib
+        diisi.</p>
+
+      <div class="status-card-row" role="radiogroup" aria-labelledby="status-hint">
+        <label class="status-card approved">
+          <input type="radio" name="doctor_status" value="Approved" {% if data.doctor_status=='Approved' %}checked{%
+            endif %} required>
+          <div class="status-card-inner">
+            <span class="status-icon" aria-hidden="true">✅</span>
+            <span class="status-text">Approved</span>
+            <span style="font-size:.7rem;color:#4b5563;">Konfirmasi hasil AI</span>
+          </div>
+        </label>
+        <label class="status-card rejected">
+          <input type="radio" name="doctor_status" value="Rejected" {% if data.doctor_status=='Rejected' %}checked{%
+            endif %}>
+          <div class="status-card-inner">
+            <span class="status-icon" aria-hidden="true">❌</span>
+            <span class="status-text">Rejected</span>
+            <span style="font-size:.7rem;color:#4b5563;">Hasil tidak sesuai</span>
+          </div>
+        </label>
+        <label class="status-card review">
+          <input type="radio" name="doctor_status" value="Needs Review" {% if data.doctor_status=='Needs Review'
+            %}checked{% endif %}>
+          <div class="status-card-inner">
+            <span class="status-icon" aria-hidden="true">⚠️</span>
+            <span class="status-text">Needs Review</span>
+            <span style="font-size:.7rem;color:#4b5563;">Perlu tinjauan lanjut</span>
+          </div>
+        </label>
+      </div>
+
+      <div class="form-group mt-3">
+        <label for="doctor_notes">Catatan Dokter <span
+            style="font-size:.75rem;font-weight:400;color:#4b5563;">(opsional)</span></label>
+        <textarea id="doctor_notes" name="doctor_notes" rows="3" aria-describedby="notes-hint"
+          placeholder="Tambahkan catatan klinis atau penjelasan keputusan…">{{ data.doctor_notes or '' }}</textarea>
+        <span id="notes-hint" class="form-hint"><span aria-hidden="true">ℹ️</span> Tampil di halaman hasil
+          prediksi.</span>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:1.25rem;">
+      <div class="card-title"><span aria-hidden="true">✏️</span> Rekomendasi Tambahan <span
+          style="font-size:.72rem;font-weight:400;color:#4b5563;">(opsional)</span></div>
+      <div class="form-grid form-grid-2">
+        <div class="form-group">
+          <label for="clinical_custom">🏥 Tambahan Klinis</label>
+          <textarea id="clinical_custom" name="clinical_custom" rows="3"
+            placeholder="Rujukan ke dr. spesifik, tindakan tambahan…">{{ data.clinical_rec_custom or '' }}</textarea>
+        </div>
+        <div class="form-group">
+          <label for="nonclinical_custom">🌿 Tambahan Non-Klinis</label>
+          <textarea id="nonclinical_custom" name="nonclinical_custom" rows="3"
+            placeholder="Program edukasi spesifik, rekomendasi gaya hidup…">{{ data.nonclinical_rec_custom or '' }}</textarea>
+        </div>
+      </div>
+    </div>
+
+    <div class="validate-sticky-footer">
+      <a href="{{ url_for('result', pred_id=data.id) }}" class="btn btn-secondary">← Kembali</a>
+      <span style="font-size:.8rem;color:#4b5563;">Rekaman <strong>#{{ data.id }}</strong></span>
+      <button type="submit" class="btn btn-primary btn-lg">💾 Simpan Validasi</button>
+    </div>
+  </form>
+</div>
+{% endblock %}

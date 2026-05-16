@@ -1,0 +1,423 @@
+{% extends "base.html" %}
+{% block title %}Hasil Prediksi #{{ data.id }}{% endblock %}
+
+{% block content %}
+{% set g = data.dr_grade %}
+{% set DR_COLORS = ['grade-0','grade-1','grade-2','grade-3','grade-4'] %}
+{% set DR_EMOJI = ['🟢','🟡','🟠','🔴','🆘'] %}
+{% set LABELS = ['No DR','Mild DR','Moderate DR','Severe DR','Proliferative DR'] %}
+{% set SMOKE_STR = ['No Info','Current','Ever','Former','Never','Not Current'] %}
+{% set GENDER_STR= ['Perempuan','Laki-laki','Lainnya'] %}
+
+<div class="page-wrapper">
+
+  <!-- Breadcrumb -->
+  <nav class="breadcrumb" aria-label="Breadcrumb">
+    <a href="{{ url_for('index') }}">Beranda</a>
+    <span class="breadcrumb-sep" aria-hidden="true">›</span>
+    {% if is_record %}
+    <a href="{{ url_for('history') }}">Riwayat</a>
+    <span class="breadcrumb-sep" aria-hidden="true">›</span>
+    <span class="breadcrumb-current" aria-current="page">Rekaman #{{ data.id }}</span>
+    {% else %}
+    <span class="breadcrumb-current" aria-current="page">Hasil Prediksi #{{ data.id }}</span>
+    {% endif %}
+  </nav>
+
+  <!-- Header -->
+  <div class="flex justify-between items-center flex-wrap gap-2"
+    style="margin-bottom:1.5rem; border-bottom: 1px solid var(--green-100); padding-bottom: 1rem;">
+    <div>
+      <h1 style="font-size:1.6rem;font-weight:800;color:var(--green-900); letter-spacing:-0.02em;">
+        Dashboard Hasil Prediksi
+      </h1>
+      <p class="text-xs text-muted" style="margin-top: 0.25rem;">
+        Rekaman <span style="font-weight:700; color:var(--green-700);">#{{ data.id }}</span> &nbsp;•&nbsp;
+        <span style="font-family:monospace;">{{ data.timestamp }}</span> &nbsp;•&nbsp;
+        Pasien: <strong>{{ data.patient_id }}</strong>
+        {% if data.patient_name %} — {{ data.patient_name }}{% endif %}
+      </p>
+    </div>
+  </div>
+
+  <!-- ═══ Baris 1: Gambar + Diagnosis ═══ -->
+  <div class="flex gap-3 flex-wrap" style="align-items:flex-start;">
+
+    <!-- Gambar Fundus -->
+    <div class="card" style="flex:1;min-width:240px;max-width:320px;">
+      <div class="card-title"> Citra Fundus</div>
+      <img class="fundus-img" src="/uploads/{{ data.img_filename }}" alt="Fundus retina pasien {{ data.patient_id }}">
+      <p class="text-xs text-muted mt-2">
+        Gambar telah diproses: Circular Crop → CLAHE (LAB) → 128×128 → /255
+      </p>
+    </div>
+
+    <!-- Diagnosis Utama -->
+    <div style="flex:2;min-width:280px;display:flex;flex-direction:column;gap:1rem;">
+
+      <!-- Grade card -->
+      <div class="card"
+        style="background: linear-gradient(135deg, #fff, var(--green-50)); border: 1px solid var(--green-200); padding: 1.5rem; border-radius: 12px;">
+        <div class="card-title"
+          style="font-weight: bold; color: var(--green-800); margin-bottom: 1rem; font-size: 1.2rem;">Hasil Analisis
+          Multimodal</div>
+
+        <div class="flex gap-4 items-center flex-wrap"
+          style="display: flex; gap: 1.5rem; align-items: center; flex-wrap: wrap;">
+
+          <div class="confidence-ring"
+            style="position: relative; width: 100px; height: 100px; display: flex; align-items: center; justify-content: center;">
+            <svg viewBox="0 0 120 120" style="transform: rotate(-90deg); width: 100%; height: 100%;">
+              <circle class="ring-track" cx="60" cy="60" r="50"
+                style="stroke: var(--green-100); fill: transparent; stroke-width: 10;" />
+              <circle class="ring-fill bar-{{ g }}" cx="60" cy="60" r="50" stroke-dasharray="314.16"
+                stroke-dashoffset="{{ 314.16 * (1 - data.confidence / 100) | round(2) }}" id="conf-ring"
+                style="fill: transparent; stroke-width: 10; stroke-linecap: round; transition: stroke-dashoffset 0.3s ease;" />
+            </svg>
+
+            <div class="ring-label"
+              style="position: absolute; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; pointer-events: none;">
+              <span class="ring-pct"
+                style="font-size: 1.1rem; font-weight: bold; color: var(--green-800); line-height: 1.1;">{{
+                data.confidence | round(1) }}%</span>
+              <span class="ring-text"
+                style="font-size: 0.6rem; color: #666; text-transform: uppercase; letter-spacing: 0.5px;">Confidence</span>
+            </div>
+          </div>
+
+          <div style="flex: 1; min-width: 200px;">
+            <div class="section-subtitle"
+              style="text-transform: uppercase; font-size: 0.75rem; letter-spacing: 1px; color: #888; margin-bottom: 0.25rem; font-weight: bold;">
+              Grade Diabetic Retinopathy</div>
+
+            <div class="grade-badge {{ DR_COLORS[g] }}"
+              style="margin-bottom: 1rem; font-size: 1rem; padding: 0.5rem 1rem; display: inline-flex; align-items: center; gap: 0.5rem; border-radius: 20px;">
+              {{ DR_EMOJI[g] }} Grade {{ g }} — {{ data.dr_label }}
+            </div>
+
+            <div style="display: flex; align-items: center; gap: 0.5rem;">
+              <span class="section-subtitle"
+                style="font-size: 0.85rem; color: #666; font-weight: bold; text-transform: uppercase;">Status
+                Validasi:</span>
+              {% if data.doctor_status and data.doctor_status != 'Pending' %}
+              <span class="status-pill pill-{{ data.doctor_status }}"
+                style="font-size: 0.75rem; padding: 0.25rem 0.75rem; border-radius: 12px; display: inline-flex; align-items: center; gap: 0.25rem;">
+                {% if data.doctor_status == 'Approved' %}✅
+                {% elif data.doctor_status == 'Rejected' %}❌
+                {% else %}⚠️{% endif %}
+                {{ data.doctor_status }}
+              </span>
+              {% else %}
+              <span class="status-pill pill-Pending"
+                style="font-size: 0.75rem; padding: 0.25rem 0.75rem; border-radius: 12px; color: #666;">⏳ Menunggu
+                Validasi</span>
+              {% endif %}
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Probability bars -->
+      <div class="card">
+        <div class="card-title">Distribusi Probabilitas Fusi</div>
+        <div class="prob-bars">
+          {% for i in range(5) %}
+          {% set pct = (data.fusion_probs[i] * 100) | round(1) %}
+          <div class="prob-row">
+            <span class="prob-label">{{ DR_EMOJI[i] }} {{ LABELS[i] }}</span>
+            <div class="prob-bar-bg">
+              <div class="prob-bar-fill bar-{{ i }}" style="width:{{ pct }}%;"></div>
+            </div>
+            <span class="prob-pct">{{ pct }}%</span>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+
+    </div><!-- end col kanan -->
+  </div>
+
+  <!-- ═══ Breakdown Model ═══ -->
+  <div class="flex gap-3 flex-wrap mt-3">
+
+    <!-- EfficientNetB5 -->
+    <div class="card" style="flex:1;min-width:240px;">
+      <div class="card-title">EfficientNetB5 (70%)</div>
+      <p class="text-xs text-muted" style="margin-bottom:.75rem;">Prediksi berbasis citra fundus</p>
+      <div class="prob-bars">
+        {% for i in range(5) %}
+        {% set pct = (data.img_probs[i] * 100) | round(1) %}
+        <div class="prob-row">
+          <span class="prob-label" style="min-width:90px;">{{ LABELS[i] }}</span>
+          <div class="prob-bar-bg">
+            <div class="prob-bar-fill bar-{{ i }}" style="width:{{ pct }}%;"></div>
+          </div>
+          <span class="prob-pct">{{ pct }}%</span>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <!-- KNN -->
+    <div class="card" style="flex:1;min-width:240px;">
+      <div class="card-title">KNN Tabular (30%)</div>
+      <p class="text-xs text-muted" style="margin-bottom:.75rem;">Prediksi berbasis data klinis sistemik</p>
+      <div style="display:flex;gap:1rem;margin-bottom:1rem;">
+        <div class="info-item" style="flex:1;">
+          <div class="info-label">P(No Diabetes)</div>
+          <div class="info-value" style="color:var(--grade-0);">
+            {{ (data.knn_no_diabetes_prob * 100) | round(1) }}%
+          </div>
+        </div>
+        <div class="info-item" style="flex:1;">
+          <div class="info-label">P(Diabetes)</div>
+          <div class="info-value" style="color:var(--grade-3);">
+            {{ (data.knn_diabetes_prob * 100) | round(1) }}%
+          </div>
+        </div>
+      </div>
+      <p class="text-xs text-muted">
+        Proyeksi semantik: P(diabetes) didistribusikan ke Grade 1–4 dengan bobot 40/30/20/10%.
+      </p>
+    </div>
+
+  </div>
+
+  <!-- ═══ XAI: Penjelasan Keputusan AI ═══ -->
+  {% if data.gradcam_filename or tab_xai %}
+  <div class="card mt-3" id="xai-section">
+    <div class="card-title" style="margin-bottom:1.25rem;">
+      <span>🔍</span> Penjelasan Keputusan AI
+      <span style="font-size:.7rem;font-weight:500;color:var(--green-600);
+                   background:var(--green-50);border:1px solid var(--green-200);
+                   border-radius:1rem;padding:.15rem .6rem;margin-left:.5rem;">
+        Explainable AI
+      </span>
+    </div>
+
+    <!-- Container Utama XAI -->
+    <div class="card"
+      style="background: #fff; border: 1px solid #e5e7eb; border-radius: 16px; padding: 1.5rem; font-family: 'Inter', sans-serif; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);">
+      <div style="display: flex; gap: 2rem; flex-wrap: wrap; align-items: flex-start;">
+
+        <!-- KOLOM KIRI: Visual Attention (Grad-CAM) -->
+        {% if data.gradcam_filename %}
+        <div style="flex: 1; min-width: 300px;">
+          <div
+            style="font-weight: 700; color: #374151; font-size: 0.85rem; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;">
+            <span style="width: 8px; height: 8px; background: #10b981; border-radius: 50%;"></span>
+            ANALISIS SPASIAL (GRAD-CAM)
+          </div>
+
+          <div style="display: flex; gap: 0.75rem; margin-bottom: 1.25rem;">
+            <div style="flex: 1; text-align: center;">
+              <img src="/uploads/{{ data.img_filename }}"
+                style="width: 100%; aspect-ratio: 1/1; border-radius: 12px; border: 1px solid #f3f4f6; object-fit: cover; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+              <span
+                style="font-size: 0.65rem; color: #9ca3af; font-weight: 600; display: block; margin-top: 0.5rem;">Citra
+                Fundus</span>
+            </div>
+            <div style="flex: 1; text-align: center;">
+              <img src="/uploads/{{ data.gradcam_filename }}"
+                style="width: 100%; aspect-ratio: 1/1; border-radius: 12px; border: 1px solid #fde68a; object-fit: cover; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+              <span
+                style="font-size: 0.65rem; color: #d97706; font-weight: 600; display: block; margin-top: 0.5rem;">Visual
+                Attention</span>
+            </div>
+          </div>
+
+          <!-- Legenda Minimalis -->
+          <div style="background: #f9fafb; padding: 0.6rem 0.8rem; border-radius: 10px; border: 1px solid #f3f4f6;">
+            <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.3rem;">
+              <span
+                style="font-size: 0.6rem; font-weight: bold; color: #9ca3af; text-transform: uppercase;">Signifikansi
+                Area</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 0.5rem;">
+              <span style="font-size: 0.65rem; color: #6b7280;">Rendah</span>
+              <div
+                style="height: 6px; flex: 1; border-radius: 10px; background: linear-gradient(90deg, #4444ff, #00ffff, #00ff00, #ffff00, #ff4444);">
+              </div>
+              <span style="font-size: 0.65rem; color: #6b7280;">Tinggi</span>
+            </div>
+          </div>
+        </div>
+        {% endif %}
+
+        <!-- Divider (Hanya muncul di layar lebar) -->
+        <div style="width: 1px; background: #f3f4f6; align-self: stretch;" class="hidden-mobile"></div>
+
+        <!-- KOLOM KANAN: Kontribusi Faktor Risiko (KNN) -->
+        {% if tab_xai %}
+        <div style="flex: 1.2; min-width: 320px;">
+          <div
+            style="font-weight: 700; color: #374151; font-size: 0.85rem; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;">
+            <span style="width: 8px; height: 8px; background: #3b82f6; border-radius: 50%;"></span>
+            KONTRIBUSI FAKTOR RISIKO KLINIS
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 0.6rem;">
+            {% for f in tab_xai %}
+            {% set is_danger = f.status != 'normal' %}
+            {% set accent = '#b7523e' if is_danger else '#5fa874' %}
+            {% set bg = '#fdf4f2' if is_danger else '#f4faf6' %}
+
+            <div
+              style="background: {{ bg }}; border-left: 4px solid {{ accent }}; border-radius: 10px; padding: 0.6rem 0.8rem; border-top: 1px solid rgba(0,0,0,0.02); border-right: 1px solid rgba(0,0,0,0.02); border-bottom: 1px solid rgba(0,0,0,0.02);">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.2rem;">
+                <span style="font-size: 0.8rem; font-weight: 700; color: #1f2937;">
+                  <span style="color: {{ accent }}; margin-right: 0.2rem;">{{ '●' if is_danger else '✓' }}</span> {{
+                  f.name }}
+                </span>
+                <span style="font-size: 0.8rem; font-weight: 800; color: {{ accent }};">{{ f.value }}</span>
+              </div>
+
+              <div
+                style="background: rgba(0,0,0,0.06); height: 5px; border-radius: 10px; overflow: hidden; margin: 0.3rem 0;">
+                <div
+                  style="width: {{ f.pct }}%; height: 100%; background: {{ accent }}; transition: width 1s cubic-bezier(0.4, 0, 0.2, 1);">
+                </div>
+              </div>
+
+              <div style="display: flex; justify-content: space-between; font-size: 0.65rem;">
+                <span style="color: #6b7280; font-weight: 500;">{{ f.label }}</span>
+                <span style="color: #9ca3af; font-family: 'Courier New', monospace; font-weight: bold;">{{ f.range_label
+                  }}</span>
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+        {% endif %}
+
+      </div>
+    </div>
+
+    <style>
+      @media (max-width: 768px) {
+        .hidden-mobile {
+          display: none;
+        }
+      }
+    </style>
+
+    {% if not data.gradcam_filename and not tab_xai %}
+    <p class="text-xs text-muted" style="font-style:italic;">
+      Data penjelasan AI tidak tersedia untuk rekaman ini.
+      Rekaman baru akan memiliki penjelasan AI secara otomatis.
+    </p>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  <!-- ═══ Data Klinis ═══ -->
+  <div class="card mt-3" style="background: #fff; border: 1px solid var(--gray-200);">
+    <div class="card-title" style="display:flex; align-items:center; gap:0.5rem;">
+      <div class="dashboard-card-icon">📋</div>
+      Detail Parameter Klinis Pasien
+    </div>
+    <div class="info-grid">
+      <div class="info-item-dash">
+        <div class="info-label-dash">Jenis Kelamin</div>
+        <div class="info-value-dash">{{ GENDER_STR[data.gender] }}</div>
+      </div>
+      <div class="info-item-dash">
+        <div class="info-label-dash">Usia</div>
+        <div class="info-value-dash">{{ data.age | int }} <small
+            style="font-weight:400; color:var(--gray-500);">Tahun</small></div>
+      </div>
+      <div class="info-item-dash">
+        <div class="info-label-dash">Hipertensi</div>
+        <div class="info-value-dash"
+          style="color:{{ 'var(--status-rejected)' if data.hypertension else 'var(--status-approved)' }};">{{ 'Ya' if
+          data.hypertension else 'Tidak' }}</div>
+      </div>
+      <div class="info-item-dash">
+        <div class="info-label-dash">Penyakit Jantung</div>
+        <div class="info-value-dash"
+          style="color:{{ 'var(--status-rejected)' if data.heart_disease else 'var(--status-approved)' }};">{{ 'Ya' if
+          data.heart_disease else 'Tidak' }}</div>
+      </div>
+      <div class="info-item-dash">
+        <div class="info-label-dash">Status Merokok</div>
+        <div class="info-value-dash">{{ SMOKE_STR[data.smoking_history] }}</div>
+      </div>
+      <div class="info-item-dash">
+        <div class="info-label-dash">Antropometri (BMI)</div>
+        <div class="info-value-dash">{{ data.bmi | round(1) }} <small
+            style="font-weight:400; color:var(--gray-500);">kg/m²</small></div>
+      </div>
+      <div class="info-item-dash" style="background:var(--green-50); border-color:var(--green-100);">
+        <div class="info-label-dash" style="color:var(--green-700);">HbA1c Level</div>
+        <div class="info-value-dash" style="color:var(--green-800); font-size:1.1rem;">{{ data.hba1c | round(1) }}<small
+            style="font-weight:400;">%</small></div>
+      </div>
+      <div class="info-item-dash" style="background:var(--green-50); border-color:var(--green-100);">
+        <div class="info-label-dash" style="color:var(--green-700);">Blood Glucose</div>
+        <div class="info-value-dash" style="color:var(--green-800); font-size:1.1rem;">{{ data.blood_glucose | int }}
+          <small style="font-weight:400;">mg/dL</small>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ Rekomendasi (jika sudah divalidasi) ═══ -->
+  {% if data.doctor_status and data.doctor_status != 'Pending' %}
+  <div class="card mt-3">
+    <div class="card-title">Rekomendasi Dokter</div>
+
+    {% if data.doctor_notes %}
+    <div class="info-item mb-2" style="margin-bottom:.75rem;">
+      <div class="info-label">Catatan Dokter</div>
+      <div class="info-value" style="font-weight:400;">{{ data.doctor_notes }}</div>
+    </div>
+    {% endif %}
+
+    <div class="flex gap-3 flex-wrap">
+      {% if data.clinical_rec_preset or data.clinical_rec_custom %}
+      <div style="flex:1;min-width:240px;">
+        <div class="section-subtitle">🏥 Rekomendasi Klinis</div>
+        {% if data.clinical_rec_preset %}
+        <ul style="padding-left:1.2rem;color:var(--gray-700);font-size:.875rem;margin-bottom:.5rem;">
+          {% for rec in data.clinical_rec_preset.split('; ') %}
+          {% if rec %}<li>{{ rec }}</li>{% endif %}
+          {% endfor %}
+        </ul>
+        {% endif %}
+        {% if data.clinical_rec_custom %}
+        <p style="font-size:.85rem;color:var(--gray-600);font-style:italic;">
+          📌 {{ data.clinical_rec_custom }}
+        </p>
+        {% endif %}
+      </div>
+      {% endif %}
+
+      {% if data.nonclinical_rec_preset or data.nonclinical_rec_custom %}
+      <div style="flex:1;min-width:240px;">
+        <div class="section-subtitle">🌿 Rekomendasi Non-Klinis</div>
+        {% if data.nonclinical_rec_preset %}
+        <ul style="padding-left:1.2rem;color:var(--gray-700);font-size:.875rem;margin-bottom:.5rem;">
+          {% for rec in data.nonclinical_rec_preset.split('; ') %}
+          {% if rec %}<li>{{ rec }}</li>{% endif %}
+          {% endfor %}
+        </ul>
+        {% endif %}
+        {% if data.nonclinical_rec_custom %}
+        <p style="font-size:.85rem;color:var(--gray-600);font-style:italic;">
+          📌 {{ data.nonclinical_rec_custom }}
+        </p>
+        {% endif %}
+      </div>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+
+  <p class="text-xs text-muted mt-3" style="text-align:center;">
+    ⚠️ Sistem ini merupakan alat bantu pengambilan keputusan klinis (CDSS) dan bukan pengganti diagnosis dokter.
+    Hasil prediksi harus selalu divalidasi oleh tenaga medis yang berwenang.
+  </p>
+
+</div>
+{% endblock %}

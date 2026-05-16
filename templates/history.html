@@ -1,0 +1,258 @@
+{% extends "base.html" %}
+{% block title %}Riwayat Prediksi{% endblock %}
+{% block content %}
+{% set DR_EMOJI = ['🟢','🟡','🟠','🔴','🆘'] %}
+<div class="page-wrapper">
+
+  <div class="page-header">
+    <h1>Riwayat Prediksi</h1>
+    <p>Total <strong>{{ records | length }}</strong> rekaman prediksi tersimpan</p>
+  </div>
+
+  <!-- Filter & Search -->
+  <div class="card"
+    style="background: #fff; border: 1px solid var(--gray-200); border-radius: 12px; padding: 1rem 1.5rem; margin-bottom: 1.25rem; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+    <div class="filter-bar" style="display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;">
+
+      <div style="flex: 1; min-width: 280px;">
+        <label for="search-input" class="sr-only">Cari rekaman</label>
+        <input type="search" id="search-input" class="filter-control"
+          style="width: 100%; padding: 0.6rem 1rem; border-radius: 10px; border: 1px solid #d1d5db; outline: none; font-size: 0.9rem; box-sizing: border-box;"
+          placeholder="🔍 Cari ID pasien, nama, atau grade…" oninput="filterTable()"
+          aria-label="Cari rekaman berdasarkan ID pasien, nama, atau grade DR" aria-controls="history-table">
+      </div>
+
+      <div style="min-width: 180px;">
+        <label for="status-filter" class="sr-only">Filter berdasarkan status</label>
+        <select id="status-filter" class="filter-control"
+          style="width: 100%; padding: 0.6rem 1rem; border-radius: 10px; border: 1px solid #d1d5db; background-color: #fff; cursor: pointer; font-size: 0.9rem; box-sizing: border-box;"
+          onchange="filterTable()" aria-label="Filter berdasarkan status validasi">
+          <option value="">Semua Status</option>
+          <option value="Pending">⏳ Pending</option>
+          <option value="Approved">✅ Approved</option>
+          <option value="Rejected">❌ Rejected</option>
+          <option value="Needs Review">⚠️ Needs Review</option>
+        </select>
+      </div>
+
+      <a href="{{ url_for('index') }}" class="btn btn-primary btn-sm"
+        style="color: #fff; padding: 0.6rem 1.25rem; border-radius: 10px; display: flex; align-items: center; justify-content: center; gap: 0.5rem; white-space: nowrap; transition: background 0.2s;">
+        <span aria-hidden="true" style="font-size: 1.1rem; line-height: 1;">+</span> Prediksi Baru
+      </a>
+
+    </div>
+  </div>
+
+  <!-- Table -->
+  <div class="card" style="padding:0;overflow:hidden;">
+    <div class="table-wrap">
+      <table id="history-table" aria-label="Tabel riwayat prediksi">
+        <thead>
+          <tr>
+            <th scope="col" onclick="sortTable(0)" tabindex="0" role="columnheader" aria-sort="none">#ID</th>
+            <th scope="col" onclick="sortTable(1)" tabindex="0">Waktu</th>
+            <th scope="col" onclick="sortTable(2)" tabindex="0">ID Pasien</th>
+            <th scope="col">Nama</th>
+            <th scope="col" onclick="sortTable(4)" tabindex="0">Grade DR</th>
+            <th scope="col" onclick="sortTable(5)" tabindex="0">Confidence</th>
+            <th scope="col">Status</th>
+            <th scope="col">Aksi</th>
+          </tr>
+        </thead>
+        <tbody id="history-tbody">
+          {% if records %}
+          {% for r in records %}
+          {% set g = r.dr_grade %}
+          {% set st = r.doctor_status or 'Pending' %}
+          <tr data-search="{{ r.patient_id }} {{ r.patient_name or '' }} {{ r.dr_label }} {{ st }}" id="row-{{ r.id }}">
+            <td><span class="fw-600" style="color:var(--green-700);">#{{ r.id }}</span></td>
+            <td style="font-size:.8rem;color:#4b5563;white-space:nowrap;">{{ r.timestamp }}</td>
+            <td class="fw-600">{{ r.patient_id }}</td>
+            <td style="font-size:.875rem;color:#4b5563;">{{ r.patient_name or '—' }}</td>
+
+            <td style="white-space: nowrap; vertical-align: middle;">
+              <span class="grade-badge {{ ['grade-0','grade-1','grade-2','grade-3','grade-4'][g] }}"
+                style="padding: 0.3rem 0.6rem; font-size: 0.75rem; display: inline-flex; align-items: center; gap: 0.3rem; white-space: nowrap;"
+                aria-label="Grade {{ g }}: {{ r.dr_label }}">
+                <span>{{ DR_EMOJI[g] }}</span> <span style="white-space: nowrap;">Grade {{ g }}</span>
+              </span>
+            </td>
+
+            <td class="fw-600" style="color:var(--green-700);">{{ r.confidence | round(1) }}%</td>
+
+            <td style="white-space: nowrap; vertical-align: middle;">
+              <span
+                class="status-pill {% if st == 'Approved' %}pill-Approved{% elif st == 'Rejected' %}pill-Rejected{% elif st == 'Needs Review' %}pill-needs-review{% else %}pill-Pending{% endif %}"
+                style="padding: 0.3rem 0.6rem; font-size: 0.75rem; display: inline-flex; align-items: center; gap: 0.3rem; white-space: nowrap;"
+                aria-label="Status: {{ st }}">
+                <span>
+                  {% if st == 'Approved' %}✅
+                  {% elif st == 'Rejected' %}❌
+                  {% elif st == 'Needs Review' %}⚠️
+                  {% else %}⏳{% endif %}
+                </span>
+                <span style="white-space: nowrap;">{{ st }}</span>
+              </span>
+            </td>
+
+            <td>
+              <div class="flex gap-1" role="group" aria-label="Aksi untuk rekaman #{{ r.id }}">
+                <a href="{{ url_for('record', pred_id=r.id) }}" class="btn btn-secondary btn-sm"
+                  aria-label="Lihat detail rekaman #{{ r.id }}" title="Lihat Detail">👁️</a>
+                <a href="{{ url_for('validate', pred_id=r.id) }}"
+                  class="btn {% if st == 'Pending' %}btn-primary{% else %}btn-secondary{% endif %} btn-sm"
+                  aria-label="{% if st == 'Pending' %}Validasi rekaman #{{ r.id }}{% else %}Edit validasi rekaman #{{ r.id }}{% endif %}"
+                  title="{% if st == 'Pending' %}Validasi{% else %}Edit{% endif %}">
+                  {% if st == 'Pending' %}✅{% else %}✏️{% endif %}
+                </a>
+                <button type="button" class="btn btn-danger btn-sm"
+                  aria-label="Hapus rekaman #{{ r.id }} pasien {{ r.patient_id }}" title="Hapus permanen"
+                  onclick="confirmDelete({{ r.id }}, '{{ r.patient_id }}')">🗑️</button>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+          {% else %}
+          <tr>
+            <td colspan="8">
+              <div class="empty-state">
+                <div class="empty-state-icon" aria-hidden="true">📭</div>
+                <h3>Belum Ada Rekaman Prediksi</h3>
+                <p>Mulai dengan menganalisis citra fundus pasien pertama Anda.</p>
+                <a href="{{ url_for('index') }}" class="btn btn-primary">Mulai Analisis →</a>
+              </div>
+            </td>
+          </tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Pagination -->
+    <div id="pagination" class="pagination" role="navigation" aria-label="Navigasi halaman tabel"></div>
+  </div>
+</div>
+
+<!-- Modal Konfirmasi Hapus -->
+<div id="delete-modal" role="dialog" aria-modal="true" aria-labelledby="modal-title" style="display:none;position:fixed;inset:0;z-index:9999;
+            background:rgba(0,0,0,.45);backdrop-filter:blur(3px);
+            align-items:center;justify-content:center;">
+  <div style="background:#fff;border-radius:1rem;padding:2rem;max-width:420px;width:90%;
+              box-shadow:0 20px 60px rgba(0,0,0,.25);text-align:center;">
+    <div style="font-size:2.5rem;margin-bottom:.75rem;" aria-hidden="true">🗑️</div>
+    <h2 id="modal-title" style="margin:0 0 .5rem;color:#1a1a1a;font-size:1.15rem;">Hapus Rekaman Permanen?</h2>
+    <p id="delete-modal-text" style="color:#4b5563;font-size:.9rem;margin-bottom:1rem;"></p>
+    <div role="alert" style="background:#fef2f2;border:1px solid #fecaca;border-radius:.5rem;
+                padding:.5rem .75rem;margin-bottom:1.5rem;font-size:.8rem;color:#dc2626;">
+      ⚠️ Data akan dihapus <strong>permanen</strong> dan tidak dapat dipulihkan.
+    </div>
+    <div class="flex gap-2 justify-center">
+      <button class="btn btn-secondary" onclick="closeDeleteModal()" id="modal-cancel">Batal</button>
+      <form id="delete-form" method="POST" style="display:inline;">
+        <button type="submit" class="btn btn-danger">Ya, Hapus Sekarang</button>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const ROWS_PER_PAGE = 10;
+  let currentPage = 1;
+  let filteredRows = [];
+
+  function getAllRows() {
+    return Array.from(document.querySelectorAll('#history-tbody tr[id^="row-"]'));
+  }
+
+  function filterTable() {
+    const q = document.getElementById('search-input').value.toLowerCase();
+    const st = document.getElementById('status-filter').value.toLowerCase();
+    filteredRows = getAllRows().filter(row => {
+      const txt = (row.dataset.search || '').toLowerCase();
+      return (!q || txt.includes(q)) && (!st || txt.includes(st));
+    });
+    getAllRows().forEach(r => r.style.display = 'none');
+    currentPage = 1;
+    renderPage();
+    renderPagination();
+  }
+
+  function renderPage() {
+    const start = (currentPage - 1) * ROWS_PER_PAGE;
+    filteredRows.forEach((r, i) => {
+      r.style.display = (i >= start && i < start + ROWS_PER_PAGE) ? '' : 'none';
+    });
+  }
+
+  function renderPagination() {
+    const total = Math.ceil(filteredRows.length / ROWS_PER_PAGE);
+    const el = document.getElementById('pagination');
+    if (total <= 1) { el.innerHTML = ''; return; }
+    let html = `<button class="page-btn" onclick="goPage(${currentPage - 1})" ${currentPage === 1 ? 'disabled' : ''} aria-label="Halaman sebelumnya">‹</button>`;
+    for (let i = 1; i <= total; i++) {
+      html += `<button class="page-btn ${i === currentPage ? 'active' : ''}" onclick="goPage(${i})" aria-label="Halaman ${i}" aria-current="${i === currentPage ? 'page' : 'false'}">${i}</button>`;
+    }
+    html += `<button class="page-btn" onclick="goPage(${currentPage + 1})" ${currentPage === total ? 'disabled' : ''} aria-label="Halaman berikutnya">›</button>`;
+    el.innerHTML = html;
+  }
+
+  function goPage(p) {
+    const total = Math.ceil(filteredRows.length / ROWS_PER_PAGE);
+    if (p < 1 || p > total) return;
+    currentPage = p;
+    renderPage();
+    renderPagination();
+  }
+
+  // Sort
+  let sortDir = {};
+  function sortTable(col) {
+    const tbody = document.getElementById('history-tbody');
+    const rows = Array.from(tbody.querySelectorAll('tr[id^="row-"]'));
+    sortDir[col] = !sortDir[col];
+    rows.sort((a, b) => {
+      const va = a.cells[col]?.textContent.trim() || '';
+      const vb = b.cells[col]?.textContent.trim() || '';
+      return sortDir[col] ? va.localeCompare(vb, 'id', { numeric: true }) : vb.localeCompare(va, 'id', { numeric: true });
+    });
+    rows.forEach(r => tbody.appendChild(r));
+    document.querySelectorAll('thead th').forEach((th, i) => {
+      th.classList.remove('sorted-asc', 'sorted-desc');
+      if (i === col) th.classList.add(sortDir[col] ? 'sorted-asc' : 'sorted-desc');
+    });
+    filteredRows = rows.filter(r => r.style.display !== 'none' || true);
+    filterTable();
+  }
+
+  // Delete modal
+  function confirmDelete(id, patientId) {
+    document.getElementById('delete-modal-text').textContent =
+      'Rekaman #' + id + ' (Pasien: ' + patientId + ') akan dihapus permanen beserta file gambar fundusnya.';
+    document.getElementById('delete-form').action = '/delete/' + id;
+    const modal = document.getElementById('delete-modal');
+    modal.style.display = 'flex';
+    document.getElementById('modal-cancel').focus();
+  }
+  function closeDeleteModal() {
+    document.getElementById('delete-modal').style.display = 'none';
+  }
+  document.getElementById('delete-modal').addEventListener('click', function (e) {
+    if (e.target === this) closeDeleteModal();
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') closeDeleteModal();
+  });
+
+  // Init
+  filteredRows = getAllRows();
+  renderPage();
+  renderPagination();
+
+  // Btn-danger override
+  const style = document.createElement('style');
+  style.textContent = `.btn-danger{background:linear-gradient(135deg,#ef4444,#dc2626);color:#fff;border:none;box-shadow:0 2px 8px rgba(239,68,68,.3)}.btn-danger:hover{background:linear-gradient(135deg,#dc2626,#b91c1c);transform:translateY(-1px)}`;
+  document.head.appendChild(style);
+</script>
+{% endblock %}

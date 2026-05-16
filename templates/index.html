@@ -1,0 +1,313 @@
+{% extends "base.html" %}
+{% block title %}Input Pasien{% endblock %}
+
+{% block content %}
+<div class="page-wrapper">
+  <div class="page-header">
+    <h1>Analisis Diabetic Retinopathy</h1>
+    <p>Masukkan citra fundus dan data klinis pasien untuk prediksi multimodal AI</p>
+  </div>
+
+  <!-- Progress Stepper -->
+  <div class="stepper" role="list" aria-label="Langkah pengisian form">
+    <div class="step active" role="listitem">
+      <div class="step-circle" aria-hidden="true">1</div>
+      <span class="step-label">Identitas &amp; Citra</span>
+    </div>
+    <div class="step-line" aria-hidden="true"></div>
+    <div class="step" role="listitem">
+      <div class="step-circle" aria-hidden="true">2</div>
+      <span class="step-label">Data Klinis</span>
+    </div>
+    <div class="step-line" aria-hidden="true"></div>
+    <div class="step" role="listitem">
+      <div class="step-circle" aria-hidden="true">3</div>
+      <span class="step-label">Analisis AI</span>
+    </div>
+  </div>
+
+  <p style="font-size:.8rem;color:#4b5563;margin-bottom:1.5rem;">
+    <span aria-hidden="true">*</span>
+    <span class="sr-only">Tanda bintang menandakan</span>
+    Kolom bertanda <strong>*</strong> wajib diisi
+  </p>
+
+  <form method="POST" action="{{ url_for('predict') }}" enctype="multipart/form-data" id="predict-form"
+    aria-label="Form analisis diabetic retinopathy" novalidate>
+
+    <!-- ═══ Baris Atas: Upload + Identitas ═══ -->
+    <div class="flex gap-3 flex-wrap" style="align-items: flex-start;">
+
+      <!-- Upload Gambar -->
+      <div class="card" style="flex: 1; min-width: 280px;">
+        <div class="card-title">Citra Fundus</div>
+
+        <div class="upload-zone" id="upload-zone" role="button" tabindex="0"
+          aria-label="Area upload citra fundus. Klik atau tekan Enter untuk memilih file."
+          aria-describedby="upload-hint">
+          <input type="file" name="fundus_image" id="fundus-input" accept=".png,.jpg,.jpeg,.tiff,.bmp" required
+            aria-required="true" aria-describedby="upload-hint">
+          <div id="upload-placeholder">
+            <div class="upload-icon">📷</div>
+            <p><strong>Klik untuk pilih</strong> atau seret gambar ke sini</p>
+            <p class="text-xs text-muted mt-1">PNG, JPG, JPEG, TIFF, BMP • Maks 16 MB</p>
+          </div>
+          <div class="upload-preview" id="upload-preview">
+            <img id="preview-img" src="" alt="Preview fundus">
+          </div>
+        </div>
+
+        <p id="upload-hint" class="text-xs text-muted mt-2">
+          <span aria-hidden="true">💡</span>
+          Citra fundus retina (funduskopi). Sistem melakukan circular crop + CLAHE otomatis.
+          Format: PNG, JPG, JPEG, TIFF, BMP. Maks: 16 MB.
+        </p>
+      </div>
+
+      <!-- Identitas Pasien -->
+      <div class="card" style="flex: 1; min-width: 280px;">
+        <div class="card-title">Identitas Pasien</div>
+        <div class="form-grid" style="grid-template-columns: 1fr;">
+          <div class="form-group">
+            <label for="patient_id">ID Pasien <span class="required">*</span></label>
+            <input type="text" id="patient_id" name="patient_id" placeholder="Contoh: RM-2024-001"
+              pattern="[A-Za-z0-9\-_]+" aria-required="true" required aria-describedby="patient-id-hint"
+              title="Huruf, angka, dash, underscore">
+            <span id="patient-id-hint" class="form-hint"><span aria-hidden="true">ℹ️</span> Format: RM-2024-001 (huruf,
+              angka, - _)</span>
+          </div>
+          <div class="form-group">
+            <label for="patient_name">Nama Pasien</label>
+            <input type="text" id="patient_name" name="patient_name" placeholder="Opsional">
+          </div>
+        </div>
+
+        <div class="divider"></div>
+        <div class="card-title" style="margin-bottom:1rem;">Demografis</div>
+
+        <div class="form-grid form-grid-2">
+          <div class="form-group">
+            <label for="gender">Jenis Kelamin <span class="required">*</span></label>
+            <select id="gender" name="gender" required>
+              <option value="" disabled selected>Pilih…</option>
+              <option value="0">Perempuan (Female)</option>
+              <option value="1">Laki-laki (Male)</option>
+              <option value="2">Lainnya (Other)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="age">Usia (tahun) <span class="required">*</span></label>
+            <input type="number" id="age" name="age" min="0" max="120" step="0.5" placeholder="Contoh: 55" required>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- end baris atas -->
+
+    <!-- ═══ Baris Bawah: Data Klinis ═══ -->
+    <div class="card mt-2">
+      <div class="card-title">Data Klinis &amp; Laboratorium</div>
+
+      <div class="form-grid">
+
+        <!-- Hipertensi -->
+        <div class="form-group">
+          <label>Hipertensi <span class="required">*</span></label>
+          <div class="toggle-row">
+            <label class="toggle-btn" id="htn-no">
+              <input type="radio" name="hypertension" value="0" required> Tidak
+            </label>
+            <label class="toggle-btn" id="htn-yes">
+              <input type="radio" name="hypertension" value="1"> Ya
+            </label>
+          </div>
+        </div>
+
+        <!-- Penyakit Jantung -->
+        <div class="form-group">
+          <label>Penyakit Jantung <span class="required">*</span></label>
+          <div class="toggle-row">
+            <label class="toggle-btn" id="hd-no">
+              <input type="radio" name="heart_disease" value="0" required> Tidak
+            </label>
+            <label class="toggle-btn" id="hd-yes">
+              <input type="radio" name="heart_disease" value="1"> Ya
+            </label>
+          </div>
+        </div>
+
+        <!-- Riwayat Merokok -->
+        <div class="form-group">
+          <label for="smoking_history">Riwayat Merokok <span class="required">*</span></label>
+          <select id="smoking_history" name="smoking_history" required>
+            <option value="" disabled selected>Pilih…</option>
+            <option value="0">No Info (Tidak ada data)</option>
+            <option value="1">Current (Perokok aktif)</option>
+            <option value="2">Ever (Pernah merokok)</option>
+            <option value="3">Former (Mantan perokok)</option>
+            <option value="4">Never (Tidak pernah)</option>
+            <option value="5">Not Current (Sudah berhenti)</option>
+          </select>
+        </div>
+
+        <!-- HbA1c -->
+        <div class="form-group">
+          <label for="hba1c">HbA1c Level (%) <span class="required">*</span></label>
+          <div class="range-row">
+            <input type="range" id="hba1c-range" min="3.5" max="9.0" step="0.1" value="5.5"
+              oninput="syncRange('hba1c', 'hba1c-range', this.value, 1)">
+            <span class="range-val" id="hba1c-val">5.5</span>
+          </div>
+          <input type="number" id="hba1c" name="hba1c" min="3.5" max="9.0" step="0.1" placeholder="5.5" required
+            style="margin-top:.35rem;" oninput="syncRange('hba1c-range', 'hba1c', this.value, 1)">
+        </div>
+
+        <!-- Blood Glucose -->
+        <div class="form-group">
+          <label for="blood_glucose">Blood Glucose Level (mg/dL) <span class="required">*</span></label>
+          <div class="range-row">
+            <input type="range" id="bg-range" min="80" max="300" step="1" value="140"
+              oninput="syncRange('blood_glucose', 'bg-range', this.value, 0)">
+            <span class="range-val" id="bg-val">140</span>
+          </div>
+          <input type="number" id="blood_glucose" name="blood_glucose" min="80" max="300" step="1" placeholder="140"
+            required style="margin-top:.35rem;" oninput="syncRange('bg-range', 'blood_glucose', this.value, 0)">
+        </div>
+
+        <!-- ── REVISI 3: TB & BB (ganti BMI) ── -->
+        <div class="form-group" style="grid-column: span 1;">
+          <label>Tinggi &amp; Berat Badan <span class="required">*</span></label>
+          <div class="form-grid form-grid-2" style="gap:.75rem; margin-top:.35rem;">
+            <div>
+              <label for="tinggi_badan" style="font-size:.78rem; color:var(--green-700); font-weight:600;">TB
+                (cm)</label>
+              <input type="number" id="tinggi_badan" name="tinggi_badan" min="100" max="250" step="0.5"
+                placeholder="Contoh: 165" required oninput="calcBMI()">
+            </div>
+            <div>
+              <label for="berat_badan" style="font-size:.78rem; color:var(--green-700); font-weight:600;">BB
+                (kg)</label>
+              <input type="number" id="berat_badan" name="berat_badan" min="20" max="300" step="0.1"
+                placeholder="Contoh: 68" required oninput="calcBMI()">
+            </div>
+          </div>
+          <!-- Live BMI display -->
+          <div id="bmi-display" style="display:none; margin-top:.6rem;
+               background:var(--green-50); border:1px solid var(--green-200);
+               border-radius:.5rem; padding:.5rem .75rem;
+               display:flex; align-items:center; gap:.5rem;">
+            <span style="font-size:.8rem; color:var(--green-700);">⚖️ BMI Terhitung:</span>
+            <span id="bmi-value" style="font-weight:700; font-size:1rem; color:var(--green-800);">—</span>
+            <span id="bmi-category" style="font-size:.75rem; padding:.15rem .5rem;
+                  border-radius:1rem; font-weight:600;"></span>
+          </div>
+        </div>
+
+      </div><!-- end form-grid -->
+    </div><!-- end card klinis -->
+
+    <!-- Submit -->
+    <div class="flex justify-between items-center flex-wrap gap-2 mt-4">
+      <p class="text-xs text-muted">
+        ⚠️ Hasil prediksi AI bersifat pendukung keputusan klinis, bukan diagnosis definitif.
+      </p>
+      <button type="submit" class="btn btn-primary btn-lg" id="submit-btn">
+        Analisis Sekarang
+      </button>
+    </div>
+
+  </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  // ── Toggle buttons (hipertensi, penyakit jantung)
+  document.querySelectorAll('.toggle-row').forEach(row => {
+    row.querySelectorAll('.toggle-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        row.querySelectorAll('.toggle-btn').forEach(b => b.classList.remove('selected'));
+        btn.classList.add('selected');
+      });
+    });
+  });
+
+  // ── Range slider sync
+  window.syncRange = function (targetId, sourceId, val, decimals) {
+    const target = document.getElementById(targetId);
+    const label = document.getElementById(sourceId + '-val');
+    if (!target) return;
+    target.value = val;
+    if (label) label.textContent = parseFloat(val).toFixed(decimals);
+  };
+
+  // ── Live BMI calculator (Revisi 3)
+  window.calcBMI = function () {
+    const tb = parseFloat(document.getElementById('tinggi_badan').value);
+    const bb = parseFloat(document.getElementById('berat_badan').value);
+    const display = document.getElementById('bmi-display');
+    const valEl = document.getElementById('bmi-value');
+    const catEl = document.getElementById('bmi-category');
+
+    if (!tb || !bb || tb <= 0) {
+      display.style.display = 'none';
+      return;
+    }
+    const bmi = bb / ((tb / 100) ** 2);
+    let cat = '', catColor = '';
+    if (bmi < 18.5) { cat = 'Underweight'; catColor = '#3b82f6'; }
+    else if (bmi < 25.0) { cat = 'Normal'; catColor = '#22c55e'; }
+    else if (bmi < 30.0) { cat = 'Overweight'; catColor = '#f59e0b'; }
+    else { cat = 'Obese'; catColor = '#ef4444'; }
+
+    valEl.textContent = bmi.toFixed(1) + ' kg/m²';
+    catEl.textContent = cat;
+    catEl.style.background = catColor + '22';
+    catEl.style.color = catColor;
+    catEl.style.border = '1px solid ' + catColor + '55';
+    display.style.display = 'flex';
+  };
+
+  // ── Image preview
+  document.getElementById('fundus-input').addEventListener('change', function (e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      document.getElementById('preview-img').src = ev.target.result;
+      document.getElementById('upload-placeholder').style.display = 'none';
+      document.getElementById('upload-preview').classList.add('visible');
+    };
+    reader.readAsDataURL(file);
+  });
+
+  // ── Drag & drop
+  const zone = document.getElementById('upload-zone');
+  zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('dragover'); });
+  zone.addEventListener('dragleave', () => zone.classList.remove('dragover'));
+  zone.addEventListener('drop', e => {
+    e.preventDefault();
+    zone.classList.remove('dragover');
+    const file = e.dataTransfer.files[0];
+    if (file) {
+      const dt = new DataTransfer();
+      dt.items.add(file);
+      document.getElementById('fundus-input').files = dt.files;
+      const reader = new FileReader();
+      reader.onload = ev => {
+        document.getElementById('preview-img').src = ev.target.result;
+        document.getElementById('upload-placeholder').style.display = 'none';
+        document.getElementById('upload-preview').classList.add('visible');
+      };
+      reader.readAsDataURL(file);
+    }
+  });
+
+  // ── Loading state on submit
+  document.getElementById('predict-form').addEventListener('submit', function () {
+    const btn = document.getElementById('submit-btn');
+    btn.disabled = true;
+    btn.textContent = '⏳ Menganalisis…';
+  });
+</script>
+{% endblock %}
