@@ -54,7 +54,7 @@ def load_efficientnet_b5():
     model.classifier[1] = nn.Linear(model.classifier[1].in_features, 5)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model.load_state_dict(
-        torch.load('models/baseline_efficientnetb5_model_V2.pth', map_location=device)
+        torch.load('models/baseline_efficientnetb5_model_V2.pth', map_location=device, weights_only=False)
     )
     model.eval()
     return model, device
